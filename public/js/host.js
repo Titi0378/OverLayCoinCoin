@@ -1,10 +1,14 @@
 (() => {
-  const rtcConfig = {
+  const defaultRtcConfig = {
     iceServers: [
       { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
     ],
     iceCandidatePoolSize: 10,
+    iceTransportPolicy: "all",
   };
+
+  let rtcConfig = defaultRtcConfig;
+  let rtcConfigPromise = null;
 
   const socket = io();
   const urlParams = new URLSearchParams(window.location.search);
@@ -46,6 +50,7 @@
   bootstrapLyricsSyncControls();
   bootstrapMusicInput();
   loadOverlayManifest();
+  void ensureRtcConfig();
 
   socket.on("connect", () => {
     setHostStatus("Signaling connected", false);
@@ -284,6 +289,45 @@
     tileRef.stateLabel.textContent = message;
   }
 
+  function normalizeRtcConfig(payload) {
+    if (!payload || !Array.isArray(payload.iceServers)) {
+      return defaultRtcConfig;
+    }
+
+    const poolSize = Number.parseInt(payload.iceCandidatePoolSize || "10", 10);
+    const iceCandidatePoolSize = Number.isFinite(poolSize) && poolSize > 0 ? poolSize : defaultRtcConfig.iceCandidatePoolSize;
+    const iceTransportPolicy = payload.iceTransportPolicy === "relay" ? "relay" : "all";
+
+    return {
+      iceServers: payload.iceServers,
+      iceCandidatePoolSize,
+      iceTransportPolicy,
+    };
+  }
+
+  async function loadRtcConfig() {
+    try {
+      const response = await fetch("/rtc-config", { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(`RTC config HTTP ${response.status}`);
+      }
+
+      const payload = await response.json();
+      rtcConfig = normalizeRtcConfig(payload);
+    } catch (error) {
+      console.warn("Could not load RTC config:", error);
+      rtcConfig = defaultRtcConfig;
+    }
+  }
+
+  function ensureRtcConfig() {
+    if (!rtcConfigPromise) {
+      rtcConfigPromise = loadRtcConfig();
+    }
+
+    return rtcConfigPromise;
+  }
+
   function hasPlayableVideo(video) {
     return video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0;
   }
@@ -469,6 +513,7 @@
   }
 
   async function startNegotiation(cameraId) {
+    await ensureRtcConfig();
     const peer = getOrCreatePeer(cameraId);
 
     if (peer.signalingState !== "stable") {

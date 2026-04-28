@@ -15,6 +15,44 @@ const io = new Server(server, {
 
 const PORT = Number(process.env.PORT || 3000);
 const rooms = new Map();
+const DEFAULT_ICE_SERVERS = [
+  { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
+];
+
+function parseCsvEnv(value) {
+  return String(value || "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function buildRtcConfig() {
+  const iceServers = [...DEFAULT_ICE_SERVERS];
+  const turnUrls = parseCsvEnv(process.env.TURN_URLS);
+
+  if (turnUrls.length) {
+    const turnServer = {
+      urls: turnUrls,
+    };
+
+    if (process.env.TURN_USERNAME && process.env.TURN_CREDENTIAL) {
+      turnServer.username = process.env.TURN_USERNAME;
+      turnServer.credential = process.env.TURN_CREDENTIAL;
+    }
+
+    iceServers.push(turnServer);
+  }
+
+  const poolSize = Number.parseInt(process.env.ICE_CANDIDATE_POOL_SIZE || "10", 10);
+  const iceCandidatePoolSize = Number.isFinite(poolSize) && poolSize > 0 ? poolSize : 10;
+  const iceTransportPolicy = process.env.ICE_TRANSPORT_POLICY === "relay" ? "relay" : "all";
+
+  return {
+    iceServers,
+    iceCandidatePoolSize,
+    iceTransportPolicy,
+  };
+}
 
 function sanitizeRoomId(value) {
   const normalized = String(value || "")
@@ -246,6 +284,10 @@ io.on("connection", (socket) => {
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true, rooms: rooms.size });
+});
+
+app.get("/rtc-config", (_req, res) => {
+  res.json(buildRtcConfig());
 });
 
 app.use(express.static(path.join(__dirname, "public")));

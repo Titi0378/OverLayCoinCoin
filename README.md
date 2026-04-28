@@ -63,6 +63,25 @@ To use phones over the network, expose your app through HTTPS (for example with 
 For internet/mobile networks, add a TURN server to improve connectivity across NAT/firewalls.
 Public STUN alone is often not enough for stable remote sessions.
 
+## TURN relay (server hosted)
+
+The app now fetches its RTC config from the server. If you run a TURN server on your host, set:
+
+- `TURN_URLS` (comma-separated list)
+- `TURN_USERNAME`
+- `TURN_CREDENTIAL`
+- `ICE_TRANSPORT_POLICY=relay` (optional, forces relay)
+
+Example:
+
+```bash
+TURN_URLS="turn:your-domain:3478?transport=udp,turns:your-domain:5349?transport=tcp" \
+TURN_USERNAME="coincoin" \
+TURN_CREDENTIAL="change-me" \
+ICE_TRANSPORT_POLICY=relay \
+npm start
+```
+
 ## Lyrics offset contract (Music Assistant embed)
 
 Host page sends this message to the embedded iframe whenever the offset changes:

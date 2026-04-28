@@ -1,10 +1,14 @@
 (() => {
-  const rtcConfig = {
+  const defaultRtcConfig = {
     iceServers: [
       { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
     ],
     iceCandidatePoolSize: 10,
+    iceTransportPolicy: "all",
   };
+
+  let rtcConfig = defaultRtcConfig;
+  let rtcConfigPromise = null;
 
   const socket = io();
   const urlParams = new URLSearchParams(window.location.search);
@@ -34,6 +38,8 @@
 
   roomCodeEl.textContent = roomId;
   cameraNameEl.textContent = cameraLabel;
+
+  void ensureRtcConfig();
 
   if (!secureMediaContext) {
     setPermissionHint(
@@ -191,6 +197,45 @@
       : "rgba(255, 255, 255, 0.08)";
   }
 
+  function normalizeRtcConfig(payload) {
+    if (!payload || !Array.isArray(payload.iceServers)) {
+      return defaultRtcConfig;
+    }
+
+    const poolSize = Number.parseInt(payload.iceCandidatePoolSize || "10", 10);
+    const iceCandidatePoolSize = Number.isFinite(poolSize) && poolSize > 0 ? poolSize : defaultRtcConfig.iceCandidatePoolSize;
+    const iceTransportPolicy = payload.iceTransportPolicy === "relay" ? "relay" : "all";
+
+    return {
+      iceServers: payload.iceServers,
+      iceCandidatePoolSize,
+      iceTransportPolicy,
+    };
+  }
+
+  async function loadRtcConfig() {
+    try {
+      const response = await fetch("/rtc-config", { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(`RTC config HTTP ${response.status}`);
+      }
+
+      const payload = await response.json();
+      rtcConfig = normalizeRtcConfig(payload);
+    } catch (error) {
+      console.warn("Could not load RTC config:", error);
+      rtcConfig = defaultRtcConfig;
+    }
+  }
+
+  function ensureRtcConfig() {
+    if (!rtcConfigPromise) {
+      rtcConfigPromise = loadRtcConfig();
+    }
+
+    return rtcConfigPromise;
+  }
+
   function isLoopbackHostname(hostname) {
     const safeHostname = String(hostname || "").toLowerCase();
     return safeHostname === "localhost" || safeHostname === "127.0.0.1" || safeHostname === "::1";
@@ -326,6 +371,7 @@
   }
 
   async function rebuildPeer() {
+    await ensureRtcConfig();
     await closePeer();
 
     peer = new RTCPeerConnection(rtcConfig);
