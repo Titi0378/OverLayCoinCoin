@@ -1,8 +1,0 @@
-{
-  email {$TLS_EMAIL}
-}
-
-{$DOMAIN} {
-  encode zstd gzip
-  reverse_proxy overlay-coincoin:3000
-}

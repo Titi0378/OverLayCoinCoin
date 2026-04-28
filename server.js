@@ -11,50 +11,11 @@ const io = new Server(server, {
     origin: "*",
     methods: ["GET", "POST"],
   },
+  maxHttpBufferSize: 1e8 // Permettre l'envoi de frames volumineuses
 });
 
 const PORT = Number(process.env.PORT || 3000);
 const rooms = new Map();
-const DEFAULT_ICE_SERVERS = [
-  { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
-];
-
-function parseCsvEnv(value) {
-  return String(value || "")
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-}
-
-function buildRtcConfig() {
-  const iceServers = [...DEFAULT_ICE_SERVERS];
-  const turnUrls = parseCsvEnv(process.env.TURN_URLS);
-  const hasTurn = turnUrls.length > 0;
-
-  if (hasTurn) {
-    const turnServer = {
-      urls: turnUrls,
-    };
-
-    if (process.env.TURN_USERNAME && process.env.TURN_CREDENTIAL) {
-      turnServer.username = process.env.TURN_USERNAME;
-      turnServer.credential = process.env.TURN_CREDENTIAL;
-    }
-
-    iceServers.push(turnServer);
-  }
-
-  const poolSize = Number.parseInt(process.env.ICE_CANDIDATE_POOL_SIZE || "10", 10);
-  const iceCandidatePoolSize = Number.isFinite(poolSize) && poolSize > 0 ? poolSize : 10;
-  const requestedPolicy = process.env.ICE_TRANSPORT_POLICY === "relay" ? "relay" : "all";
-  const iceTransportPolicy = hasTurn ? requestedPolicy : "all";
-
-  return {
-    iceServers,
-    iceCandidatePoolSize,
-    iceTransportPolicy,
-  };
-}
 
 function sanitizeRoomId(value) {
   const normalized = String(value || "")
@@ -217,65 +178,16 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("host-offer", ({ cameraId, sdp } = {}) => {
-    if (socket.data.role !== "host") {
-      return;
-    }
+  socket.on("video-frame", ({ roomId, frame } = {}) => {
+    if (socket.data.role !== "camera") return;
+    const safeRoomId = sanitizeRoomId(roomId);
+    const room = rooms.get(safeRoomId);
+    if (!room || !room.hostId || !frame) return;
 
-    const room = rooms.get(socket.data.roomId || "");
-    if (!room || !room.cameras.has(cameraId) || !sdp) {
-      return;
-    }
-
-    io.to(cameraId).emit("host-offer", {
-      sdp,
-    });
-  });
-
-  socket.on("camera-answer", ({ sdp } = {}) => {
-    if (socket.data.role !== "camera") {
-      return;
-    }
-
-    const room = rooms.get(socket.data.roomId || "");
-    if (!room || !room.hostId || !sdp) {
-      return;
-    }
-
-    io.to(room.hostId).emit("camera-answer", {
+    // Transmettre la frame à l'hôte
+    io.to(room.hostId).emit("video-frame", {
       cameraId: socket.id,
-      sdp,
-    });
-  });
-
-  socket.on("ice-candidate-to-camera", ({ cameraId, candidate } = {}) => {
-    if (socket.data.role !== "host") {
-      return;
-    }
-
-    const room = rooms.get(socket.data.roomId || "");
-    if (!room || !room.cameras.has(cameraId) || !candidate) {
-      return;
-    }
-
-    io.to(cameraId).emit("ice-candidate-to-camera", {
-      candidate,
-    });
-  });
-
-  socket.on("ice-candidate-to-host", ({ candidate } = {}) => {
-    if (socket.data.role !== "camera") {
-      return;
-    }
-
-    const room = rooms.get(socket.data.roomId || "");
-    if (!room || !room.hostId || !candidate) {
-      return;
-    }
-
-    io.to(room.hostId).emit("ice-candidate-to-host", {
-      cameraId: socket.id,
-      candidate,
+      frame,
     });
   });
 
@@ -286,10 +198,6 @@ io.on("connection", (socket) => {
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true, rooms: rooms.size });
-});
-
-app.get("/rtc-config", (_req, res) => {
-  res.json(buildRtcConfig());
 });
 
 app.use(express.static(path.join(__dirname, "public")));

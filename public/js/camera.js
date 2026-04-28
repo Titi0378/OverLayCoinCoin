@@ -1,16 +1,7 @@
 (() => {
-  const defaultRtcConfig = {
-    iceServers: [
-      { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
-    ],
-    iceCandidatePoolSize: 10,
-    iceTransportPolicy: "all",
-  };
-
-  let rtcConfig = defaultRtcConfig;
-  let rtcConfigPromise = null;
-
-  const socket = io();
+  const socket = io({
+    maxHttpBufferSize: 1e8
+  });
   const urlParams = new URLSearchParams(window.location.search);
 
   const roomId = sanitizeRoomId(urlParams.get("room"));
@@ -27,7 +18,7 @@
   const enableCameraBtn = document.getElementById("enableCameraBtn");
 
   let localStream = null;
-  let peer = null;
+  let sendInterval = null;
   let currentFacingMode = "environment";
   let preparingMediaPromise = null;
   let isSocketConnected = false;
@@ -38,8 +29,6 @@
 
   roomCodeEl.textContent = roomId;
   cameraNameEl.textContent = cameraLabel;
-
-  void ensureRtcConfig();
 
   if (!secureMediaContext) {
     setPermissionHint(
@@ -80,55 +69,13 @@
   });
 
   socket.on("host-ready", () => {
-    setCameraStatus("Host online. Waiting for call", false);
+    setCameraStatus("Host online. Starting to stream", false);
+    startStreaming();
   });
 
   socket.on("host-left", async () => {
     setCameraStatus("Host disconnected", true);
-    await closePeer();
-  });
-
-  socket.on("host-offer", async ({ sdp } = {}) => {
-    if (!sdp) {
-      return;
-    }
-
-    if (!hasLocalMedia) {
-      showPermissionGate();
-      setPermissionHint('Grant camera access first with "Enable camera".', true);
-      setCameraStatus("Camera permission needed", true);
-      return;
-    }
-
-    try {
-      await rebuildPeer();
-
-      await peer.setRemoteDescription(new RTCSessionDescription(sdp));
-
-      const answer = await peer.createAnswer();
-      await peer.setLocalDescription(answer);
-
-      socket.emit("camera-answer", {
-        sdp: peer.localDescription,
-      });
-
-      setCameraStatus("Streaming to host", false);
-    } catch (error) {
-      console.error("Could not answer host offer:", error);
-      setCameraStatus("Offer processing failed", true);
-    }
-  });
-
-  socket.on("ice-candidate-to-camera", async ({ candidate } = {}) => {
-    if (!peer || !candidate) {
-      return;
-    }
-
-    try {
-      await peer.addIceCandidate(candidate);
-    } catch (error) {
-      console.warn("Could not add ICE candidate on camera:", error);
-    }
+    stopStreaming();
   });
 
   enableCameraBtn.addEventListener("click", async () => {
@@ -422,3 +369,7 @@
     peer = null;
   }
 })();
+
+
+
+

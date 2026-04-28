@@ -1,16 +1,7 @@
 (() => {
-  const defaultRtcConfig = {
-    iceServers: [
-      { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
-    ],
-    iceCandidatePoolSize: 10,
-    iceTransportPolicy: "all",
-  };
+  
 
-  let rtcConfig = defaultRtcConfig;
-  let rtcConfigPromise = null;
-
-  const socket = io();
+  const socket = io({ maxHttpBufferSize: 1e8 });
   const urlParams = new URLSearchParams(window.location.search);
   const roomId = sanitizeRoomId(urlParams.get("room"));
   const defaultMusicUrl = "https://music.rubbersoul.uk/#/party";
@@ -35,7 +26,7 @@
   const lyricsOffsetValueEl = document.getElementById("lyricsOffsetValue");
   const musicFrameEl = document.getElementById("musicFrame");
 
-  const peers = new Map();
+  
   const cameraTiles = new Map();
   const activeOverlays = new Map();
   const overlayCatalog = new Map();
@@ -50,7 +41,7 @@
   bootstrapLyricsSyncControls();
   bootstrapMusicInput();
   loadOverlayManifest();
-  void ensureRtcConfig();
+  
 
   socket.on("connect", () => {
     setHostStatus("Signaling connected", false);
@@ -84,33 +75,7 @@
     removeCamera(cameraId);
   });
 
-  socket.on("camera-answer", async ({ cameraId, sdp } = {}) => {
-    const peer = peers.get(cameraId);
-    if (!peer || !sdp) {
-      return;
-    }
-
-    try {
-      await peer.setRemoteDescription(new RTCSessionDescription(sdp));
-      setTileState(cameraId, "pending", "Link established");
-    } catch (error) {
-      console.error("Could not set remote description:", error);
-      setTileState(cameraId, "error", "Answer error");
-    }
-  });
-
-  socket.on("ice-candidate-to-host", async ({ cameraId, candidate } = {}) => {
-    const peer = peers.get(cameraId);
-    if (!peer || !candidate) {
-      return;
-    }
-
-    try {
-      await peer.addIceCandidate(candidate);
-    } catch (error) {
-      console.warn("Could not add ICE candidate on host:", error);
-    }
-  });
+  
 
   socket.on("host-replaced", () => {
     setHostStatus("Another host took this room", true);
@@ -328,9 +293,7 @@
     return rtcConfigPromise;
   }
 
-  function hasPlayableVideo(video) {
-    return video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0;
-  }
+  function hasPlayableVideo(video) { return !!video.src; }
 
   function clearHealthCheck(cameraId) {
     const tileRef = cameraTiles.get(cameraId);
@@ -395,18 +358,12 @@
     tile.dataset.linkState = "pending";
     tile.style.setProperty("--stagger", `${Math.min(cameraTiles.size * 55, 340)}ms`);
 
-    const video = document.createElement("video");
-    video.autoplay = true;
-    video.playsInline = true;
-    video.muted = true;
-    video.setAttribute("autoplay", "");
-    video.setAttribute("playsinline", "");
-    video.setAttribute("muted", "");
-
-    video.addEventListener("loadedmetadata", () => {
-      void video.play().catch(() => undefined);
-    });
-
+    const video = document.createElement("img");
+    video.className = "camera-view";
+    video.style.objectFit = "cover";
+    video.style.width = "100%";
+    video.style.height = "100%";
+    
     video.addEventListener("error", () => {
       setTileState(cameraId, "error", "Video error");
     });
@@ -453,106 +410,6 @@
     applyFocusMode();
   }
 
-  function getOrCreatePeer(cameraId) {
-    if (peers.has(cameraId)) {
-      return peers.get(cameraId);
-    }
-
-    const peer = new RTCPeerConnection(rtcConfig);
-    peer.addTransceiver("video", { direction: "recvonly" });
-
-    peer.onicecandidate = (event) => {
-      if (event.candidate) {
-        socket.emit("ice-candidate-to-camera", {
-          cameraId,
-          candidate: event.candidate,
-        });
-      }
-    };
-
-    peer.ontrack = (event) => {
-      const tileRef = cameraTiles.get(cameraId);
-      if (!tileRef) {
-        return;
-      }
-
-      const [stream] = event.streams;
-      if (stream) {
-        tileRef.video.srcObject = stream;
-      } else if (event.track) {
-        if (!tileRef.remoteStream) {
-          tileRef.remoteStream = new MediaStream();
-        }
-
-        tileRef.remoteStream.addTrack(event.track);
-        tileRef.video.srcObject = tileRef.remoteStream;
-      }
-
-      clearHealthCheck(cameraId);
-      void tileRef.video.play().catch(() => undefined);
-      setTileState(cameraId, "live", "Live");
-    };
-
-    peer.onconnectionstatechange = () => {
-      const state = peer.connectionState;
-      if (state === "connected") {
-        setTileState(cameraId, "live", "Live");
-        clearHealthCheck(cameraId);
-      } else if (state === "connecting") {
-        setTileState(cameraId, "pending", "Syncing");
-      } else if (state === "failed" || state === "disconnected") {
-        setTileState(cameraId, "error", "Signal lost");
-        void restartIce(cameraId);
-      } else if (state === "closed") {
-        setTileState(cameraId, "error", "Closed");
-      }
-    };
-
-    peers.set(cameraId, peer);
-    return peer;
-  }
-
-  async function startNegotiation(cameraId) {
-    await ensureRtcConfig();
-    const peer = getOrCreatePeer(cameraId);
-
-    if (peer.signalingState !== "stable") {
-      return;
-    }
-
-    try {
-      setTileState(cameraId, "pending", "Dialing");
-      const offer = await peer.createOffer();
-      await peer.setLocalDescription(offer);
-      socket.emit("host-offer", {
-        cameraId,
-        sdp: peer.localDescription,
-      });
-      scheduleHealthCheck(cameraId);
-    } catch (error) {
-      console.error("Could not create host offer:", error);
-      setTileState(cameraId, "error", "Offer failed");
-    }
-  }
-
-  async function restartIce(cameraId) {
-    const peer = peers.get(cameraId);
-    if (!peer) {
-      return;
-    }
-
-    try {
-      const offer = await peer.createOffer({ iceRestart: true });
-      await peer.setLocalDescription(offer);
-      socket.emit("host-offer", {
-        cameraId,
-        sdp: peer.localDescription,
-      });
-    } catch (error) {
-      console.warn("ICE restart failed:", error);
-    }
-  }
-
   async function upsertCamera(camera) {
     if (!camera || !camera.cameraId) {
       return;
@@ -567,25 +424,7 @@
       cameraTiles.get(cameraId).nameLabel.textContent = safeLabel;
     }
 
-    await startNegotiation(cameraId);
-  }
-
-  function closePeer(cameraId) {
-    const peer = peers.get(cameraId);
-    if (!peer) {
-      return;
-    }
-
-    peers.delete(cameraId);
-
-    try {
-      peer.ontrack = null;
-      peer.onicecandidate = null;
-      peer.onconnectionstatechange = null;
-      peer.close();
-    } catch (error) {
-      console.warn("Could not close peer:", error);
-    }
+    setTileState(cameraId, "ready", "Attente de flux");
   }
 
   function removeCamera(cameraId) {
@@ -595,10 +434,10 @@
 
     clearHealthCheck(cameraId);
 
-    closePeer(cameraId);
+    
 
     const tileRef = cameraTiles.get(cameraId);
-    const stream = tileRef.video.srcObject;
+    const stream = null;
     if (stream) {
       stream.getTracks().forEach((track) => track.stop());
     }
