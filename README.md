@@ -49,6 +49,34 @@ Then open:
 
 For phones or other camera devices on a LAN or public network, put HTTPS in front of the container. Browser camera access requires a secure context, so the container itself should be behind a reverse proxy or tunnel that terminates TLS.
 
+## Docker compose with TURN (recommended for different networks)
+
+When host and cameras are on different networks, you need a TURN relay. The compose stack now ships with coturn.
+
+1) Copy the example env file and edit it:
+
+```bash
+copy .env.example .env
+```
+
+Fill in:
+
+- `TURN_URLS` with your public domain or IP
+- `TURN_REALM` and `TURN_EXTERNAL_IP`
+- `TURN_USERNAME` / `TURN_CREDENTIAL`
+
+2) Start the stack:
+
+```bash
+docker compose up --build
+```
+
+3) Open firewall ports on the server:
+
+- `3478/udp` and `3478/tcp`
+- `49160-49200/udp` (relay media)
+
+
 ## Camera permission on phone / second device
 
 Browsers allow camera access only in secure contexts (`https://`) or on `localhost`.
