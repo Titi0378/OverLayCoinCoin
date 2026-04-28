@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Coincoin Live - Choose Role</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="landing-body">
+    <div class="ambient-layer" aria-hidden="true">
+      <span class="orb orb-a"></span>
+      <span class="orb orb-b"></span>
+      <span class="orb orb-c"></span>
+    </div>
+
+    <main class="landing-root">
+      <section class="landing-panel fade-up">
+        <section class="landing-copy">
+          <p class="eyebrow">Coincoin Live Control Room</p>
+          <h1>Build a wild party stream with live cameras and overlays.</h1>
+          <p>
+            One host dashboard. Multiple phone cameras. Dynamic layout. Music panel.
+            Ready for game night.
+          </p>
+
+          <div class="feature-strip">
+            <span>WebRTC low latency</span>
+            <span>Dynamic camera grid</span>
+            <span>Overlay ready</span>
+            <span>Music assistant panel</span>
+          </div>
+        </section>
+
+        <section class="landing-form" aria-label="Role selection">
+          <h2>Join a room</h2>
+
+          <label class="field-label" for="roomInput">Room code</label>
+          <input
+            id="roomInput"
+            class="text-input"
+            type="text"
+            maxlength="64"
+            value="coincoin-party"
+            autocomplete="off"
+            spellcheck="false"
+          />
+
+          <label id="cameraNameField" class="field-block" for="cameraNameInput" hidden>
+            Camera name
+            <input
+              id="cameraNameInput"
+              class="text-input"
+              type="text"
+              maxlength="32"
+              value="Cam Table 1"
+              autocomplete="off"
+            />
+          </label>
+
+          <label id="musicUrlField" class="field-block" for="musicUrlInput" hidden>
+            Music Assistant URL (host)
+            <input
+              id="musicUrlInput"
+              class="text-input"
+              type="text"
+              placeholder="https://music.local"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </label>
+
+          <div class="role-grid" role="group" aria-label="Choose role">
+            <button id="hostRoleBtn" type="button" class="role-card" data-role="host">
+              <span class="role-title">Host</span>
+              <span class="role-text">Main control dashboard on stream screen</span>
+            </button>
+            <button id="cameraRoleBtn" type="button" class="role-card" data-role="camera">
+              <span class="role-title">Camera</span>
+              <span class="role-text">Phone or webcam sending live feed</span>
+            </button>
+          </div>
+
+          <button id="launchBtn" class="launch-btn" type="button" disabled>Choose role first</button>
+        </section>
+      </section>
+    </main>
+
+    <script src="/js/landing.js"></script>
+  </body>
+</html>

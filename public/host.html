@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Coincoin Live - Host</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="host-body">
+    <div class="ambient-layer" aria-hidden="true">
+      <span class="orb orb-a"></span>
+      <span class="orb orb-b"></span>
+      <span class="orb orb-c"></span>
+    </div>
+
+    <main class="host-root">
+      <section class="video-stage fade-up">
+        <header class="stage-header">
+          <div>
+            <p class="eyebrow">Coincoin Broadcast Desk</p>
+            <h1 class="stage-title">Live Cameras</h1>
+          </div>
+
+          <div class="stage-meta">
+            <span id="roomBadge" class="pill">Room: <strong id="roomCode">coincoin-party</strong></span>
+            <span id="cameraCountBadge" class="pill">0 cameras</span>
+            <span id="hostConnectionBadge" class="pill">Connecting...</span>
+            <button id="projectionModeBtn" class="icon-btn" type="button">Projection mode</button>
+            <button id="fullscreenBtn" class="icon-btn" type="button">Fullscreen</button>
+            <button id="clearFocusBtn" class="icon-btn" type="button" disabled>Back to grid</button>
+          </div>
+        </header>
+
+        <div class="camera-grid-wrap">
+          <section id="cameraGrid" class="camera-grid" data-count="0" aria-label="Camera streams"></section>
+
+          <div id="emptyState" class="empty-state">
+            <h3>No camera connected yet</h3>
+            <p>Open camera mode on phones and join this room.</p>
+          </div>
+
+          <div id="overlayLayer" class="overlay-layer" aria-hidden="true"></div>
+        </div>
+
+        <section class="overlay-controls">
+          <div class="overlay-head">
+            <h2>Overlays</h2>
+            <span class="small-note">PNG assets from /public/overlays</span>
+          </div>
+          <div id="overlayList" class="overlay-list"></div>
+        </section>
+      </section>
+
+      <aside class="music-column fade-up" aria-label="Music assistant panel">
+        <header class="music-head">
+          <h2>Music Assistant</h2>
+          <p>Embed your player, automation UI or playlist page.</p>
+        </header>
+
+        <form id="musicForm" class="music-form">
+          <input
+            id="musicUrlInput"
+            class="text-input"
+            type="text"
+            placeholder="https://music.local"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button class="icon-btn" type="submit">Load</button>
+        </form>
+
+        <section class="music-sync" aria-label="Lyrics sync controls">
+          <label for="lyricsOffsetRange">Lyrics offset</label>
+          <input
+            id="lyricsOffsetRange"
+            class="music-range"
+            type="range"
+            min="-5000"
+            max="5000"
+            step="100"
+            value="0"
+          />
+          <span id="lyricsOffsetValue" class="pill">0 ms</span>
+        </section>
+
+        <iframe
+          id="musicFrame"
+          class="music-frame"
+          title="Music Assistant"
+          src="about:blank"
+          loading="lazy"
+          referrerpolicy="no-referrer"
+        ></iframe>
+      </aside>
+    </main>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/host.js"></script>
+  </body>
+</html>

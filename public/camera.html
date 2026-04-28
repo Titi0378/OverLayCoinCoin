@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Coincoin Live - Camera</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="camera-body">
+    <div class="ambient-layer" aria-hidden="true">
+      <span class="orb orb-a"></span>
+      <span class="orb orb-b"></span>
+      <span class="orb orb-c"></span>
+    </div>
+
+    <main class="camera-root fade-up">
+      <section class="camera-card">
+        <header class="camera-head">
+          <div>
+            <p class="eyebrow">Camera Uplink</p>
+            <h1>Live camera sender</h1>
+          </div>
+          <a class="icon-btn" href="/">Change role</a>
+        </header>
+
+        <div class="camera-meta">
+          <span class="pill">Room: <strong id="roomCode">coincoin-party</strong></span>
+          <span class="pill">Name: <strong id="cameraName">Camera</strong></span>
+        </div>
+
+        <section id="permissionGate" class="permission-gate">
+          <p id="permissionHint" class="permission-hint">
+            Click "Enable camera" then allow browser access to start streaming.
+          </p>
+          <button id="enableCameraBtn" class="icon-btn" type="button">Enable camera</button>
+        </section>
+
+        <div class="preview-shell">
+          <video id="localVideo" autoplay muted playsinline></video>
+        </div>
+
+        <div class="camera-actions">
+          <button id="switchCameraBtn" class="icon-btn" type="button" disabled>Switch camera</button>
+          <span id="cameraStatus" class="pill">Booting camera...</span>
+          <span id="signalStatus" class="pill">Signaling offline</span>
+        </div>
+      </section>
+    </main>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/camera.js"></script>
+  </body>
+</html>

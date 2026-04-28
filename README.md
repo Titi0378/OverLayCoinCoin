@@ -1,0 +1,88 @@
+# Coincoin Live Control Room
+
+WebRTC + Socket.io app to stream multiple camera feeds to a single host dashboard with:
+
+- Role landing page (Host or Camera)
+- Dynamic host camera layout (1..N sources)
+- Click to focus one camera, click again to go back to grid
+- Dedicated music panel on the right side (300px, full height)
+- Projection mode + fullscreen mode for clean output
+- Lyrics offset control for music embeds (when supported by your Music Assistant page)
+- Overlay architecture using transparent PNG assets and manifest
+
+## Stack
+
+- Frontend: HTML, CSS (Grid/Flex), Vanilla JS
+- Signaling backend: Node.js + Express + Socket.io
+- Video transport: WebRTC peer connections (camera -> host)
+- ICE bootstrap: public STUN servers (Google)
+
+## Run locally
+
+```bash
+npm install
+npm run dev
+```
+
+Then open:
+
+- http://localhost:3000
+
+## Run in Docker
+
+Build and start the container:
+
+```bash
+docker compose up --build
+```
+
+Or, with plain Docker:
+
+```bash
+docker build -t overlay-coincoin .
+docker run --rm -p 3000:3000 -e PORT=3000 overlay-coincoin
+```
+
+Then open:
+
+- http://localhost:3000
+
+For phones or other camera devices on a LAN or public network, put HTTPS in front of the container. Browser camera access requires a secure context, so the container itself should be behind a reverse proxy or tunnel that terminates TLS.
+
+## Camera permission on phone / second device
+
+Browsers allow camera access only in secure contexts (`https://`) or on `localhost`.
+
+- `http://localhost:3000` works on the same machine.
+- `http://<LAN-IP>:3000` usually blocks camera permission (no prompt).
+
+To use phones over the network, expose your app through HTTPS (for example with ngrok or Cloudflare Tunnel).
+
+## Important for production
+
+For internet/mobile networks, add a TURN server to improve connectivity across NAT/firewalls.
+Public STUN alone is often not enough for stable remote sessions.
+
+## Lyrics offset contract (Music Assistant embed)
+
+Host page sends this message to the embedded iframe whenever the offset changes:
+
+```json
+{
+	"type": "coincoin:set-lyrics-offset-ms",
+	"value": 1200
+}
+```
+
+The iframe URL also receives `lyricsOffsetMs` query param on load.
+If your Music Assistant page listens to this message/param, you can slow down or delay lyrics display live.
+
+## File map
+
+- `server.js`: signaling server and room/role orchestration
+- `public/index.html`: role selection landing page
+- `public/host.html`: host dashboard with camera grid + music panel + overlays
+- `public/camera.html`: camera sender page
+- `public/js/host.js`: host WebRTC and UI logic
+- `public/js/camera.js`: camera WebRTC sender logic
+- `public/overlays/manifest.json`: overlay catalog
