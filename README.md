@@ -47,6 +47,20 @@ Then open:
 
 - http://localhost:3000
 
+## No TURN (same LAN or VPN)
+
+Without a TURN relay, WebRTC works only when host and cameras can reach each other directly (same Wi-Fi/LAN or a VPN like Tailscale/ZeroTier).
+
+- Keep `ICE_TRANSPORT_POLICY` as `all` (default).
+- Leave `TURN_URLS` empty.
+- Use HTTPS for camera devices (or localhost on the same machine).
+
+Docker (no TURN):
+
+```bash
+docker compose up --build
+```
+
 For phones or other camera devices on a LAN or public network, put HTTPS in front of the container. Browser camera access requires a secure context, so the container itself should be behind a reverse proxy or tunnel that terminates TLS.
 
 ## Docker compose with TURN (recommended for different networks)
@@ -68,7 +82,7 @@ Fill in:
 2) Start the stack:
 
 ```bash
-docker compose up --build
+docker compose --profile turn up --build
 ```
 
 3) Open firewall ports on the server:

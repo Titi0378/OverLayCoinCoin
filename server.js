@@ -29,8 +29,9 @@ function parseCsvEnv(value) {
 function buildRtcConfig() {
   const iceServers = [...DEFAULT_ICE_SERVERS];
   const turnUrls = parseCsvEnv(process.env.TURN_URLS);
+  const hasTurn = turnUrls.length > 0;
 
-  if (turnUrls.length) {
+  if (hasTurn) {
     const turnServer = {
       urls: turnUrls,
     };
@@ -45,7 +46,8 @@ function buildRtcConfig() {
 
   const poolSize = Number.parseInt(process.env.ICE_CANDIDATE_POOL_SIZE || "10", 10);
   const iceCandidatePoolSize = Number.isFinite(poolSize) && poolSize > 0 ? poolSize : 10;
-  const iceTransportPolicy = process.env.ICE_TRANSPORT_POLICY === "relay" ? "relay" : "all";
+  const requestedPolicy = process.env.ICE_TRANSPORT_POLICY === "relay" ? "relay" : "all";
+  const iceTransportPolicy = hasTurn ? requestedPolicy : "all";
 
   return {
     iceServers,

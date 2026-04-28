@@ -8,12 +8,12 @@ services:
       TURN_URLS: ${TURN_URLS}
       TURN_USERNAME: ${TURN_USERNAME}
       TURN_CREDENTIAL: ${TURN_CREDENTIAL}
-      ICE_TRANSPORT_POLICY: ${ICE_TRANSPORT_POLICY:-relay}
-    depends_on:
-      - turn
+      ICE_TRANSPORT_POLICY: ${ICE_TRANSPORT_POLICY:-all}
     restart: unless-stopped
 
   turn:
+    profiles:
+      - turn
     image: coturn/coturn:4.6.2
     command:
       - -n
