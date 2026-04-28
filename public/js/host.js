@@ -35,6 +35,7 @@
   const cameraTiles = new Map();
   const activeOverlays = new Map();
   const overlayCatalog = new Map();
+  const videoHealthTimeoutMs = 8000;
 
   let focusedCameraId = null;
   let lyricsOffsetMs = initialLyricsOffsetMs;
@@ -283,6 +284,46 @@
     tileRef.stateLabel.textContent = message;
   }
 
+  function hasPlayableVideo(video) {
+    return video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0;
+  }
+
+  function clearHealthCheck(cameraId) {
+    const tileRef = cameraTiles.get(cameraId);
+    if (!tileRef || !tileRef.healthTimeoutId) {
+      return;
+    }
+
+    window.clearTimeout(tileRef.healthTimeoutId);
+    tileRef.healthTimeoutId = null;
+  }
+
+  function scheduleHealthCheck(cameraId) {
+    const tileRef = cameraTiles.get(cameraId);
+    if (!tileRef) {
+      return;
+    }
+
+    clearHealthCheck(cameraId);
+
+    tileRef.healthTimeoutId = window.setTimeout(() => {
+      const currentTile = cameraTiles.get(cameraId);
+      if (!currentTile || hasPlayableVideo(currentTile.video)) {
+        return;
+      }
+
+      if (currentTile.restartAttempts < 1) {
+        currentTile.restartAttempts += 1;
+        setTileState(cameraId, "pending", "Retrying stream");
+        void restartIce(cameraId);
+        scheduleHealthCheck(cameraId);
+        return;
+      }
+
+      setTileState(cameraId, "error", "No video");
+    }, videoHealthTimeoutMs);
+  }
+
   function applyFocusMode() {
     const hasFocus = Boolean(focusedCameraId) && cameraTiles.has(focusedCameraId);
 
@@ -314,6 +355,17 @@
     video.autoplay = true;
     video.playsInline = true;
     video.muted = true;
+    video.setAttribute("autoplay", "");
+    video.setAttribute("playsinline", "");
+    video.setAttribute("muted", "");
+
+    video.addEventListener("loadedmetadata", () => {
+      void video.play().catch(() => undefined);
+    });
+
+    video.addEventListener("error", () => {
+      setTileState(cameraId, "error", "Video error");
+    });
 
     const hud = document.createElement("div");
     hud.className = "camera-hud";
@@ -346,6 +398,8 @@
       tile,
       video,
       remoteStream: null,
+      healthTimeoutId: null,
+      restartAttempts: 0,
       nameLabel,
       stateLabel: stateText,
     });
@@ -390,6 +444,7 @@
         tileRef.video.srcObject = tileRef.remoteStream;
       }
 
+      clearHealthCheck(cameraId);
       void tileRef.video.play().catch(() => undefined);
       setTileState(cameraId, "live", "Live");
     };
@@ -398,10 +453,12 @@
       const state = peer.connectionState;
       if (state === "connected") {
         setTileState(cameraId, "live", "Live");
+        clearHealthCheck(cameraId);
       } else if (state === "connecting") {
         setTileState(cameraId, "pending", "Syncing");
       } else if (state === "failed" || state === "disconnected") {
         setTileState(cameraId, "error", "Signal lost");
+        void restartIce(cameraId);
       } else if (state === "closed") {
         setTileState(cameraId, "error", "Closed");
       }
@@ -426,9 +483,28 @@
         cameraId,
         sdp: peer.localDescription,
       });
+      scheduleHealthCheck(cameraId);
     } catch (error) {
       console.error("Could not create host offer:", error);
       setTileState(cameraId, "error", "Offer failed");
+    }
+  }
+
+  async function restartIce(cameraId) {
+    const peer = peers.get(cameraId);
+    if (!peer) {
+      return;
+    }
+
+    try {
+      const offer = await peer.createOffer({ iceRestart: true });
+      await peer.setLocalDescription(offer);
+      socket.emit("host-offer", {
+        cameraId,
+        sdp: peer.localDescription,
+      });
+    } catch (error) {
+      console.warn("ICE restart failed:", error);
     }
   }
 
@@ -471,6 +547,8 @@
     if (!cameraTiles.has(cameraId)) {
       return;
     }
+
+    clearHealthCheck(cameraId);
 
     closePeer(cameraId);
 
