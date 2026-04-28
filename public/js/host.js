@@ -9,7 +9,8 @@
   const socket = io();
   const urlParams = new URLSearchParams(window.location.search);
   const roomId = sanitizeRoomId(urlParams.get("room"));
-  const initialMusicUrl = urlParams.get("music") || localStorage.getItem("coincoin_music_url") || "";
+  const defaultMusicUrl = "https://music.rubbersoul.uk/#/party";
+  const initialMusicUrl = urlParams.get("music") || localStorage.getItem("coincoin_music_url") || defaultMusicUrl;
   const initialLyricsOffsetMs = clampLyricsOffset(
     Number.parseInt(localStorage.getItem("coincoin_lyrics_offset_ms") || "0", 10)
   );
@@ -117,6 +118,21 @@
   projectionModeBtn.addEventListener("click", () => {
     const willEnable = !document.body.classList.contains("projection-mode");
     setProjectionMode(willEnable);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || !document.body.classList.contains("projection-mode")) {
+      return;
+    }
+
+    event.preventDefault();
+    setProjectionMode(false);
+
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch((error) => {
+        console.warn("Could not exit fullscreen after leaving projection mode:", error);
+      });
+    }
   });
 
   fullscreenBtn.addEventListener("click", () => {
@@ -329,6 +345,7 @@
     cameraTiles.set(cameraId, {
       tile,
       video,
+      remoteStream: null,
       nameLabel,
       stateLabel: stateText,
     });
@@ -364,8 +381,16 @@
       const [stream] = event.streams;
       if (stream) {
         tileRef.video.srcObject = stream;
+      } else if (event.track) {
+        if (!tileRef.remoteStream) {
+          tileRef.remoteStream = new MediaStream();
+        }
+
+        tileRef.remoteStream.addTrack(event.track);
+        tileRef.video.srcObject = tileRef.remoteStream;
       }
 
+      void tileRef.video.play().catch(() => undefined);
       setTileState(cameraId, "live", "Live");
     };
 
